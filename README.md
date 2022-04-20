@@ -20,4 +20,9 @@ Region: EU433
 U8g2 by Oliver (Graphics Library for Displays)
 
 ## installation
-compile and flash into Heltec board, then watch the display
+compile and flash into Heltec board, then watch the display:
+
+Callsign   min-RSSI   actual-RSSI   max-RSSI
+
+the display can show up to 6 different callsigns
+
