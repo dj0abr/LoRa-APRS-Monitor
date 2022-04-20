@@ -3,6 +3,8 @@ a simple monitor to test the signal of an LoRa APRS tracker
 
 it shows the callsign and RSSI of received stations
 
+![alt text](https://github.com/dj0abr/LoRa-APRS-Monitor/blob/main/hmon.png)
+
 ## required hardware
 HELTEC WiFi Lora 32(V2) Board
 
@@ -26,4 +28,4 @@ Callsign   min-RSSI   actual-RSSI   max-RSSI
 
 the display can show up to 6 different callsigns, the last RXed callsign is highlighted
 
-![alt text](https://github.com/dj0abr/LoRa-APRS-Monitor/blob/main/hmon.png)
+
