@@ -26,4 +26,4 @@ Callsign   min-RSSI   actual-RSSI   max-RSSI
 
 the display can show up to 6 different callsigns, the last RXed callsign is highlighted
 
-![alt text](https://github.com/dj0abr/LoRa-APRS-Monitor/hmon.png)
+![alt text](https://github.com/dj0abr/LoRa-APRS-Monitor/blob/main/hmon.png)
