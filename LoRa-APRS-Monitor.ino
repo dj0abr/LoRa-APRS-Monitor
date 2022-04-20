@@ -15,15 +15,21 @@
 
 #include <SPI.h>      // standard Arduino Library
 #include "LoRa.h"     // LoRa for Semtech SX1276/77/78/79 Chipy by Sandeep Mistry (included with this source)
-#include <U8x8lib.h>  // to be included with the arduino library manager (U8g2 by Oliver)
+#include <U8g2lib.h>
 
 // define display
-U8X8_SSD1306_128X64_NONAME_SW_I2C oled(15, 4, 16);
+U8G2_SSD1306_128X64_NONAME_1_SW_I2C oled(U8G2_R0, 15, 4, 16);
 
 // pin numbers for LoRa Chip
 #define ss 18
 #define rst 14
 #define dio0 26
+
+#define MAXLINES 6
+String call[MAXLINES];
+int act_rssi[MAXLINES];
+int min_rssi[MAXLINES];
+int max_rssi[MAXLINES];
 
 void setup() 
 {
@@ -31,11 +37,7 @@ void setup()
   
   // print Welcome message
   oled.begin();
-  oled.setFont(u8x8_font_courB18_2x3_r);
-  oled.drawString(0, 0, "LoRaAPRS");
-  oled.drawString(0, 3, "Monitor");
-  oled.setFont(u8x8_font_amstrad_cpc_extended_r);
-  oled.drawString(0, 6, "by DJ0ABR");
+  drawDisplay(1,0);
 
   // init SPI interface
   SPI.begin(5, 19, 27, 18);
@@ -44,8 +46,7 @@ void setup()
 
   // Initialize LoRa chip 
   if (!LoRa.begin(433775000)) {
-
-    oled.drawString(0, 6, "LoRa failed");
+    drawDisplay(3,0);
     while (1);
   }
 
@@ -56,14 +57,20 @@ void setup()
   LoRa.setCodingRate4(5);
   LoRa.enableCrc();
 
-  delay(1000);
-  oled.drawString(0, 7, "Init OK !");
   delay(2000);
+
+  // clear display and reset variables
+  oled.clearDisplay();
+  for(int i=0; i<MAXLINES; i++)
+  {
+    call[i] = "";
+    act_rssi[i] = 0;
+    min_rssi[i] = 1000;
+    max_rssi[i] = -1000;
+  }
 }
 
 #define MAXRXLEN 200
-String rxstr;
-int rssi;
 
 void loop() 
 {
@@ -74,20 +81,21 @@ void loop()
   {
     // read packet
     int idx = 0;
-    rxstr = "";
+    String rxstr = "";
     while (LoRa.available()) 
     {
       rxstr += (char)LoRa.read();
       if(++idx >= MAXRXLEN) break;
     }
 
+    Serial.print(rxstr);
+    
     // ignore non-APRS packets
     if(rxstr[0] != '<') return;
 
-    Serial.print(rxstr);
-
     // read rssi of last reception
-    rssi = LoRa.packetRssi();
+    int rssi = LoRa.packetRssi();
+    Serial.print(rssi);
 
     // extract source callsign
     int pos = rxstr.indexOf('>'); // source callsign ends here
@@ -98,29 +106,92 @@ void loop()
   }
 }
 
-int line = 0;
-String lines[8];
-
 void printLine(String source, int rssi)
 {
-  // clear display if it is the first data after reset
-  if(line == 0) oled.clearDisplay();
-  
-  if(line < 8)
+  // check if the new source callsign is already in the screen
+  for(int i=0; i<MAXLINES; i++)
   {
-    // display is not full, print line by line
-    lines[line++] = source + " " + String(rssi);    
-  }
-  else
-  {
-    // display is full, scroll display then print last line
-    for(int i=0; i<7; i++)
-      lines[i] = lines[i+1];
-      
-    lines[7] = source + " " + String(rssi);    
+    Serial.print(source);
+    Serial.print(call[i]);
+    if(source == call[i])
+    {
+      Serial.print("found");
+      // callsign exists, update line
+      act_rssi[i] = rssi;
+      if(rssi < min_rssi[i]) min_rssi[i] = rssi;
+      if(rssi > max_rssi[i]) max_rssi[i] = rssi;
+      // draw lines to display
+      drawDisplay(2,i);
+      return;
+    }
   }
 
+  // new callsign, make new entry
+
+  // search free line
+  int line = -1;
+  for(int i=0; i<MAXLINES; i++)
+  {
+    if(call[i] == "")
+    {
+      line = i;
+      break;
+    }
+  }
+
+  if(line == -1) return; // no more free lines
+
+  // enter new data in line "line"
+  call[line] = source;
+  act_rssi[line] = min_rssi[line] = max_rssi[line] = rssi;
+
   // draw lines to display
-  for(int i=0; i<8; i++)
-    oled.drawString(0, i, lines[i].c_str());    
+  drawDisplay(2,line);
+}
+
+void drawDisplay(int mode, int actline)
+{
+char s[50];
+
+  oled.firstPage();
+  do {
+    if(mode == 1)
+    {
+      // welcome
+      oled.setFont(u8g2_font_ncenB14_tr);
+      oled.drawStr(0,24,"LoRa APRS");
+      oled.drawStr(0,40,"Monitor");
+      oled.setFont(u8g2_font_helvB08_tf);
+      oled.drawStr(0,60,"DJ0ABR");
+    }
+  
+    if(mode == 2)
+    {
+      // APRS monitor data    
+      oled.setFont(u8g2_font_profont11_tr);
+      for(int i=0; i<MAXLINES; i++)
+      {
+        if(call[i] == "") continue;
+        if(i == actline)
+        {
+          oled.setDrawColor(1);
+          oled.drawBox(0,i*10+1,127,10+1);
+          oled.setDrawColor(0);        
+        }
+        else
+        {
+          oled.setDrawColor(1);
+        }
+        sprintf(s,"%8.8s %3d %3d %3d",call[i],min_rssi[i],act_rssi[i],max_rssi[i]);
+        oled.drawStr(0,i*10+10,s);
+      }
+    }
+    
+    if(mode == 3)
+    {
+      // LoRa Error
+      oled.setFont(u8g2_font_ncenB14_tr);
+      oled.drawStr(0,24,"LoRa ERROR");
+    }
+  } while ( oled.nextPage() );
 }
